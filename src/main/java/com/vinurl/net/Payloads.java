@@ -23,7 +23,7 @@ public final class Payloads {
 		PayloadTypeRegistry.serverboundPlay().register(SetUrl.TYPE, SetUrl.CODEC);
 	}
 
-	private static <T extends CustomPacketPayload> CustomPacketPayload.Type<T> type(String path) {
+	private static <T extends CustomPacketPayload> CustomPacketPayload.Type<T> typeOf(String path) {
 		return new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(MOD_ID, path));
 	}
 
@@ -38,7 +38,7 @@ public final class Payloads {
 
 	/** Server -> client: start playing a disc at a jukebox (pos) or on an entity (entityID). */
 	public record PlaySound(BlockPos pos, int entityID, String url) implements CustomPacketPayload {
-		public static final Type<PlaySound> TYPE = type("play_sound");
+		public static final Type<PlaySound> TYPE = typeOf("play_sound");
 		public static final StreamCodec<FriendlyByteBuf, PlaySound> CODEC = StreamCodec.of(
 			(buf, msg) -> {
 				writeNullablePos(buf, msg.pos());
@@ -56,7 +56,7 @@ public final class Payloads {
 
 	/** Server -> client: stop a disc, optionally cancelling its download. */
 	public record StopSound(BlockPos pos, int entityID, String url, boolean cancel) implements CustomPacketPayload {
-		public static final Type<StopSound> TYPE = type("stop_sound");
+		public static final Type<StopSound> TYPE = typeOf("stop_sound");
 		public static final StreamCodec<FriendlyByteBuf, StopSound> CODEC = StreamCodec.of(
 			(buf, msg) -> {
 				writeNullablePos(buf, msg.pos());
@@ -75,7 +75,7 @@ public final class Payloads {
 
 	/** Server -> client: open the screen to enter a URL. */
 	public record OpenScreen(String url, int duration) implements CustomPacketPayload {
-		public static final Type<OpenScreen> TYPE = type("open_screen");
+		public static final Type<OpenScreen> TYPE = typeOf("open_screen");
 		public static final StreamCodec<FriendlyByteBuf, OpenScreen> CODEC = StreamCodec.of(
 			(buf, msg) -> {
 				buf.writeUtf(msg.url());
@@ -92,7 +92,7 @@ public final class Payloads {
 
 	/** Client -> server: save the URL, duration and lock state on the disc in hand. */
 	public record SetUrl(String url, int duration, boolean lock) implements CustomPacketPayload {
-		public static final Type<SetUrl> TYPE = type("set_url");
+		public static final Type<SetUrl> TYPE = typeOf("set_url");
 		public static final StreamCodec<FriendlyByteBuf, SetUrl> CODEC = StreamCodec.of(
 			(buf, msg) -> {
 				buf.writeUtf(msg.url());
