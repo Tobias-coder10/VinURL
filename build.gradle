@@ -11,12 +11,10 @@ base {
 }
 
 repositories {
-	maven { url = "https://maven.wispforest.io" }
 	maven { url = "https://jitpack.io" }
 }
 
 dependencies {
-	annotationProcessor (implementation"io.wispforest:owo-lib:${run_owo_version}")
 	minecraft "com.mojang:minecraft:${run_minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${run_fabric_loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${run_fabric_version}"

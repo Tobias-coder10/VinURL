@@ -1,9 +1,7 @@
 name: Build and Publish
 
+# Alleen handmatig: in deze kopie zijn er geen Modrinth-sleutels.
 on:
-  push:
-    paths:
-      - "CHANGELOG.md"
   workflow_dispatch:
 
 env:
