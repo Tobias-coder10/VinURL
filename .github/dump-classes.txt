@@ -1,4 +1,0 @@
-private:net.minecraft.world.level.block.entity.JukeboxBlockEntity
-private:net.minecraft.client.gui.Hud
-list:atlases/
-cat:assets/minecraft/atlases/gui.json
