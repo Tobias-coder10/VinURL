@@ -56,6 +56,10 @@ jobs:
               case "$line" in
                 list:*) echo "===== LIST ${line#list:}" >> dump.txt
                         unzip -l "$JAR" | awk '{print $4}' | grep -E "${line#list:}" >> dump.txt ;;
+                cat:*)  echo "===== CAT ${line#cat:}" >> dump.txt
+                        unzip -p "$JAR" "${line#cat:}" >> dump.txt 2>&1 ;;
+                private:*) echo "===== ${line#private:}" >> dump.txt
+                        javap -p -cp "$JAR" "${line#private:}" >> dump.txt 2>&1 ;;
                 *)      echo "===== $line" >> dump.txt
                         javap -public -cp "$JAR" "$line" >> dump.txt 2>&1 ;;
               esac
