@@ -3,7 +3,6 @@ package com.vinurl.client;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
-import org.lwjgl.glfw.GLFW;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.concurrent.CompletableFuture;
 
@@ -18,8 +17,8 @@ public class KeyListener {
 	public static void register() {
 		acceptKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 			"key.vinurl.accept",
-			InputConstants.Type.KEYSYM,
-			GLFW.GLFW_KEY_Y,
+			InputConstants.Type.KEYBOARD,
+			InputConstants.KEY_Y,
 			KeyMapping.Category.register(KEY_MAPPING_ID)
 		));
 

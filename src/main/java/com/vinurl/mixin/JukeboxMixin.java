@@ -1,6 +1,7 @@
 package com.vinurl.mixin;
 
 import com.vinurl.api.VinURLSound;
+import com.vinurl.util.DiscData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -18,8 +19,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import static com.vinurl.util.Constants.DURATION_KEY;
 
 @Mixin(JukeboxBlockEntity.class)
 public abstract class JukeboxMixin extends BlockEntity {
@@ -53,7 +52,7 @@ public abstract class JukeboxMixin extends BlockEntity {
 		if (level == null || level.isClientSide()) {return;}
 		CompoundTag tag = blockEntity.getTheItem().getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 		JukeboxSongPlayer manager = blockEntity.getSongPlayer();
-		if (tag.has(DURATION_KEY) && manager.getTicksSinceSongStarted() > tag.get(DURATION_KEY) * 20L) {
+		if (DiscData.hasDuration(tag) && manager.getTicksSinceSongStarted() > DiscData.duration(tag) * 20L) {
 			manager.stop(level, state);
 			VinURLSound.stopAt((ServerLevel) level, blockEntity.getTheItem(), pos, false);
 		}

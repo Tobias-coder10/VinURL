@@ -2,9 +2,8 @@ package com.vinurl.cmd;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.vinurl.client.SoundManager;
-import com.vinurl.client.VinURLClient;
 import com.vinurl.exe.Executable;
-import io.wispforest.owo.config.ui.ConfigScreen;
+import com.vinurl.gui.ConfigScreen;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -57,7 +56,7 @@ public class Commands {
 	}
 
 	private static int openConfig(CommandContext<FabricClientCommandSource> ctx) {
-		ctx.getSource().getClient().schedule(() -> CLIENT.gui.setScreen(ConfigScreen.create(VinURLClient.CONFIG, null)));
+		ctx.getSource().getClient().schedule(() -> CLIENT.gui.setScreen(ConfigScreen.create(null)));
 		return 1;
 	}
 }

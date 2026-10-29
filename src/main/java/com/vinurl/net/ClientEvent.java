@@ -6,21 +6,20 @@ import com.vinurl.client.SoundManager;
 import com.vinurl.exe.Executable;
 import com.vinurl.gui.URLDiscScreen;
 import com.vinurl.util.Url;
-import io.wispforest.endec.annotations.IsNullable;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 
 import static com.vinurl.client.VinURLClient.CONFIG;
-import static com.vinurl.util.Constants.NETWORK_CHANNEL;
 
 public class ClientEvent {
 
 	public static void register() {
 		// Client event for playing sounds
-		NETWORK_CHANNEL.registerClientbound(PlaySoundRecord.class, (message, access) -> {
-			Minecraft client = access.runtime();
+		ClientPlayNetworking.registerGlobalReceiver(Payloads.PlaySound.TYPE, (message, context) -> {
+			Minecraft client = context.client();
 			BlockPos pos = message.pos();
 			int entityID = message.entityID();
 			Url url = Url.parse(message.url());
@@ -71,7 +70,7 @@ public class ClientEvent {
 		});
 
 		// Client event for stopping sounds
-		NETWORK_CHANNEL.registerClientbound(StopSoundRecord.class, (message, access) -> {
+		ClientPlayNetworking.registerGlobalReceiver(Payloads.StopSound.TYPE, (message, context) -> {
 			BlockPos pos = message.pos();
 			int entityID = message.entityID();
 			boolean cancel = message.cancel();
@@ -82,17 +81,11 @@ public class ClientEvent {
 		});
 
 		// Client event to open record ui
-		NETWORK_CHANNEL.registerClientbound(GUIRecord.class, (message, access) -> {
+		ClientPlayNetworking.registerGlobalReceiver(Payloads.OpenScreen.TYPE, (message, context) -> {
 			String url = message.url();
 			int duration = message.duration();
 
-			access.runtime().gui.setScreen(new URLDiscScreen(url, duration));
+			context.client().gui.setScreen(new URLDiscScreen(url, duration));
 		});
 	}
-
-	public record PlaySoundRecord(@IsNullable(mayOmitField = false) BlockPos pos, int entityID, String url) {}
-
-	public record StopSoundRecord(@IsNullable(mayOmitField = false) BlockPos pos, int entityID, String url, boolean cancel) {}
-
-	public record GUIRecord(String url, int duration) {}
 }

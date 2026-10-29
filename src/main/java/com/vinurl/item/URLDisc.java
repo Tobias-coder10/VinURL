@@ -1,9 +1,12 @@
 package com.vinurl.item;
 
-import com.vinurl.net.ClientEvent;
+import com.vinurl.net.Payloads;
+import com.vinurl.util.DiscData;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -30,8 +33,10 @@ public class URLDisc extends Item {
 		ItemStack stack = player.getItemInHand(hand);
 		if (!level.isClientSide()) {
 			CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-			if (!tag.get(LOCK_KEY)) {
-				NETWORK_CHANNEL.serverHandle(player).send(new ClientEvent.GUIRecord(tag.get(URL_KEY), tag.get(DURATION_KEY)));
+			if (!DiscData.locked(tag)) {
+				if (player instanceof ServerPlayer serverPlayer && ServerPlayNetworking.canSend(serverPlayer, Payloads.OpenScreen.TYPE)) {
+					ServerPlayNetworking.send(serverPlayer, new Payloads.OpenScreen(DiscData.url(tag), DiscData.duration(tag)));
+				}
 			} else {
 				player.sendOverlayMessage(Component.translatable("item.vinurl.custom_record.message.locked"));
 			}

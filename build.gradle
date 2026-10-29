@@ -12,6 +12,7 @@ base {
 
 repositories {
 	maven { url = "https://jitpack.io" }
+	maven { url = "https://maven.terraformersmc.com/" }
 }
 
 dependencies {
@@ -20,6 +21,9 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${run_fabric_version}"
 
 	include (implementation "org.apache.commons:commons-exec:1.6.0")
+
+	// Mod Menu is optional: only needed to compile the settings-button integration
+	compileOnly "com.terraformersmc:modmenu:${run_modmenu_version}"
 }
 
 processResources {

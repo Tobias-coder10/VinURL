@@ -3,116 +3,119 @@ package com.vinurl.gui;
 import com.vinurl.client.SoundManager;
 import com.vinurl.client.VinURLClient;
 import com.vinurl.exe.Executable;
+import com.vinurl.net.Payloads;
 import com.vinurl.net.ServerEvent;
-import io.wispforest.owo.ui.base.BaseUIModelScreen;
-import io.wispforest.owo.ui.component.*;
-import io.wispforest.owo.ui.container.StackLayout;
-import io.wispforest.owo.ui.core.PositionedRectangle;
-import io.wispforest.owo.ui.util.NinePatchTexture;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
 
 import static com.vinurl.client.VinURLClient.CLIENT;
 import static com.vinurl.util.Constants.*;
 
-public class URLDiscScreen extends BaseUIModelScreen<StackLayout> {
+/**
+ * Screen to enter the URL of a disc, with automatic duration, lock and a duration slider.
+ * Enter or Escape saves and closes. Built with vanilla widgets instead of owo-lib.
+ */
+public class URLDiscScreen extends Screen {
+	private static final int PADDING = 10;
+	private static final int GAP = 4;
+	private static final int BUTTON_SIZE = 20;
+	private static final int TEXT_WIDTH = 120;
+	private static final int PANEL_WIDTH = TEXT_WIDTH + 2 * (GAP + BUTTON_SIZE);
+	private static final int PANEL_HEIGHT = 20 + GAP + 20;
+
 	private String url;
 	private boolean lock;
-	private boolean sliderDragged;
 	private boolean simulate;
 	private int duration;
 
-	private final ButtonComponent.Renderer SIMULATE_BUTTON_TEXTURE = (matrices, button, delta) -> {
-		Identifier texture = !simulate ? (button.active && button.isHovered() ?
-			SIMULATE_BUTTON_HOVER_ID :
-			SIMULATE_BUTTON_ID) :
-			SIMULATE_BUTTON_DISABLED_ID;
-		NinePatchTexture.draw(texture, matrices, button.getX(), button.getY(), button.getWidth(), button.getHeight());
-	};
-
-	private final ButtonComponent.Renderer LOCK_BUTTON_TEXTURE = (matrices, button, delta) -> {
-		Identifier texture = lock ?
-			LOCK_BUTTON_ID :
-			LOCK_BUTTON_DISABLED_ID;
-		NinePatchTexture.draw(texture, matrices, button.getX(), button.getY(), button.getWidth(), button.getHeight());
-	};
+	private EditBox urlTextbox;
+	private DurationSlider durationSlider;
+	private IconButton simulateButton;
 
 	public URLDiscScreen(String defaultURL, int defaultDuration) {
-		super(StackLayout.class, DataSource.asset(URL_DISC_SCREEN_ID));
+		super(Component.translatable("item.vinurl.custom_record"));
 		this.url = defaultURL;
-		this.duration = defaultDuration;
+		this.duration = Math.clamp(defaultDuration, ServerEvent.MIN_DURATION, ServerEvent.MAX_DURATION);
 	}
 
 	@Override
-	protected void build(StackLayout stackLayout) {
-		LabelComponent placeholderLabel = stackLayout.childById(LabelComponent.class, "placeholder_label");
-		TextBoxComponent urlTextbox = stackLayout.childById(TextBoxComponent.class, "url_textbox");
-		SlimSliderComponent durationSlider = stackLayout.childById(SlimSliderComponent.class, "duration_slider");
-		ButtonComponent lockButton = stackLayout.childById(ButtonComponent.class, "lock_button");
-		ButtonComponent simulateButton = stackLayout.childById(ButtonComponent.class, "simulate_button");
-		TextureComponent textFieldTexture = stackLayout.childById(TextureComponent.class, "text_field_disabled");
+	protected void init() {
+		int left = (this.width - PANEL_WIDTH) / 2;
+		int top = (this.height - PANEL_HEIGHT) / 2;
 
-		durationSlider.value(duration);
-		durationSlider.tooltipSupplier((slider) -> Component.literal("%02d:%02d".formatted(duration / 60, duration % 60)));
-		durationSlider.mouseDown().subscribe((click, doubled) -> {
-			sliderDragged = true;
-			lockButton.active = simulateButton.active = false;
-			return true;
-		});
-		durationSlider.mouseUp().subscribe((click) -> {
-			sliderDragged = false;
-			lockButton.active = simulateButton.active = true;
-			return true;
-		});
-		durationSlider.onChanged().subscribe((newValue) -> duration = (int) newValue);
-		durationSlider.mouseScroll().subscribe((mouseX, mouseY, amount) -> {
-			durationSlider.value(Math.clamp(durationSlider.value() + amount, durationSlider.min(), durationSlider.max()));
-			return true;
-		});
+		urlTextbox = new EditBox(this.font, left, top, TEXT_WIDTH, 20, Component.translatable("gui.vinurl.textfield.placeholder"));
+		urlTextbox.setMaxLength(ServerEvent.MAX_URL_LENGTH);
+		urlTextbox.setHint(Component.translatable("gui.vinurl.textfield.placeholder"));
+		urlTextbox.setValue(url);
+		urlTextbox.setResponder(text -> url = text);
+		this.addRenderableWidget(urlTextbox);
 
-		lockButton.renderer(LOCK_BUTTON_TEXTURE);
-		lockButton.onPress((button) -> lock = !lock);
+		simulateButton = new IconButton(
+			left + TEXT_WIDTH + GAP, top, BUTTON_SIZE,
+			Component.translatable("gui.vinurl.button.duration.tooltip"),
+			button -> simulate ? SIMULATE_BUTTON_DISABLED_ID : (button.isHovered() ? SIMULATE_BUTTON_HOVER_ID : SIMULATE_BUTTON_ID),
+			button -> calculateDuration()
+		);
+		simulateButton.setTooltip(Tooltip.create(Component.translatable("gui.vinurl.button.duration.tooltip")));
+		this.addRenderableWidget(simulateButton);
 
-		simulateButton.renderer(SIMULATE_BUTTON_TEXTURE);
-		simulateButton.onPress((button) -> {
-			if (simulate) {return;}
-			simulate = true;
-			button.tooltip(Component.translatable("gui.vinurl.button.duration.tooltip.calculating"));
-			Executable.executeCommand(
-				SoundManager.getFileName(url) + "/duration", Executable.YT_DLP.getCommandLine().addArguments(new String[] {
-					url, "--print", "DURATION: %(duration)d", "--no-playlist",
-                    "--js-runtimes", "deno:" + Executable.DENO.FILE_PATH
-				}, false).addArguments(VinURLClient.CONFIG.parameters())
-			).subscribe("duration")
-				.onOutput((output) -> {
-					String type = output.substring(0, output.indexOf(':') + 1);
-					String message = output.substring(type.length()).trim();
+		IconButton lockButton = new IconButton(
+			left + TEXT_WIDTH + GAP + BUTTON_SIZE + GAP, top, BUTTON_SIZE,
+			Component.translatable("gui.vinurl.button.lock"),
+			button -> lock ? LOCK_BUTTON_ID : LOCK_BUTTON_DISABLED_ID,
+			button -> lock = !lock
+		);
+		lockButton.setTooltip(Tooltip.create(Component.translatable("gui.vinurl.button.lock")));
+		this.addRenderableWidget(lockButton);
 
-					switch (type) {
-						case "DURATION:" -> durationSlider.value(Integer.parseInt(message));
-						case "WARNING:" -> LOGGER.warn(message);
-						case "ERROR:" -> LOGGER.error(message);
-						default -> LOGGER.info(output);
-					}
-				})
-				.onError((error) -> {button.tooltip(Component.translatable("gui.vinurl.button.duration.tooltip")); simulate = false;})
-				.onComplete(() -> {button.tooltip(Component.translatable("gui.vinurl.button.duration.tooltip")); simulate = false;})
-			.start();
-		});
+		durationSlider = new DurationSlider(left, top + 20 + GAP, PANEL_WIDTH, 20);
+		this.addRenderableWidget(durationSlider);
 
-		urlTextbox.onChanged().subscribe((text) -> placeholderLabel.text(Component.literal((url = text).isEmpty() ? "URL" : "")));
-		urlTextbox.text(url);
-		urlTextbox.focusLost().subscribe(() -> textFieldTexture.visibleArea(PositionedRectangle.of(0, 0, 110, 16)));
-		urlTextbox.focusGained().subscribe((source) -> textFieldTexture.visibleArea(PositionedRectangle.of(0, 0, 0, 0)));
+		this.setInitialFocus(urlTextbox);
+	}
+
+	private void calculateDuration() {
+		if (simulate || url.isBlank()) {return;}
+		simulate = true;
+		simulateButton.setTooltip(Tooltip.create(Component.translatable("gui.vinurl.button.duration.tooltip.calculating")));
+
+		Executable.executeCommand(
+			SoundManager.getFileName(url) + "/duration", Executable.YT_DLP.getCommandLine().addArguments(new String[] {
+				url, "--print", "DURATION: %(duration)d", "--no-playlist",
+				"--js-runtimes", "deno:" + Executable.DENO.FILE_PATH
+			}, false).addArguments(VinURLClient.CONFIG.parameters())
+		).subscribe("duration")
+			.onOutput((output) -> {
+				String type = output.substring(0, output.indexOf(':') + 1);
+				String message = output.substring(type.length()).trim();
+
+				switch (type) {
+					case "DURATION:" -> CLIENT.execute(() -> durationSlider.setDuration(Integer.parseInt(message)));
+					case "WARNING:" -> LOGGER.warn(message);
+					case "ERROR:" -> LOGGER.error(message);
+					default -> LOGGER.info(output);
+				}
+			})
+			.onError((error) -> CLIENT.execute(this::finishCalculating))
+			.onComplete(() -> CLIENT.execute(this::finishCalculating))
+		.start();
+	}
+
+	private void finishCalculating() {
+		simulate = false;
+		simulateButton.setTooltip(Tooltip.create(Component.translatable("gui.vinurl.button.duration.tooltip")));
 	}
 
 	@Override
 	public boolean keyPressed(KeyEvent input) {
-		if (input.key() == GLFW.GLFW_KEY_ESCAPE || input.key() == GLFW.GLFW_KEY_ENTER) {
-			NETWORK_CHANNEL.clientHandle().send(new ServerEvent.SetURLRecord(url, duration, lock));
+		if (input.isEscape() || input.isConfirmation()) {
+			ClientPlayNetworking.send(new Payloads.SetUrl(url, duration, lock));
 			this.onClose();
 			return true;
 		}
@@ -120,20 +123,46 @@ public class URLDiscScreen extends BaseUIModelScreen<StackLayout> {
 	}
 
 	@Override
-	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-		super.extractRenderState(context, mouseX, mouseY, delta);
-
-		if (sliderDragged) {
-			context.setTooltipForNextFrame(
-				CLIENT.font,
-				Component.literal("%02d:%02d".formatted(duration / 60, duration % 60)),
-				mouseX, mouseY
-			);
-		}
+	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+		int left = (this.width - PANEL_WIDTH) / 2;
+		int top = (this.height - PANEL_HEIGHT) / 2;
+		// simple dark panel behind the widgets
+		graphics.fill(left - PADDING, top - PADDING, left + PANEL_WIDTH + PADDING, top + PANEL_HEIGHT + PADDING, 0xC0101010);
+		super.extractRenderState(graphics, mouseX, mouseY, delta);
 	}
 
 	@Override
 	public boolean isPauseScreen() {
 		return false;
+	}
+
+	private static String formatDuration(int seconds) {
+		return "%02d:%02d".formatted(seconds / 60, seconds % 60);
+	}
+
+	/** Slider from 0 to 3600 seconds that shows the duration as mm:ss. */
+	private class DurationSlider extends AbstractSliderButton {
+		private static final int MAX = ServerEvent.MAX_DURATION;
+
+		DurationSlider(int x, int y, int width, int height) {
+			super(x, y, width, height, Component.empty(), (double) duration / MAX);
+			updateMessage();
+		}
+
+		void setDuration(int seconds) {
+			duration = Math.clamp(seconds, 0, MAX);
+			this.value = (double) duration / MAX;
+			updateMessage();
+		}
+
+		@Override
+		protected void updateMessage() {
+			setMessage(Component.literal(formatDuration(duration)));
+		}
+
+		@Override
+		protected void applyValue() {
+			duration = (int) Math.round(this.value * MAX);
+		}
 	}
 }

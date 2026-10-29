@@ -1,6 +1,7 @@
 package com.vinurl;
 
 import com.vinurl.item.URLDisc;
+import com.vinurl.net.Payloads;
 import com.vinurl.net.ServerEvent;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
@@ -21,6 +22,7 @@ public class VinURL implements ModInitializer {
 
 		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register((itemGroup) -> itemGroup.accept(CUSTOM_RECORD));
 
+		Payloads.register();
 		ServerEvent.register();
 	}
 }

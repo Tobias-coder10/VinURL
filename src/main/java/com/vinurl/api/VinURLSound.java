@@ -1,9 +1,12 @@
 package com.vinurl.api;
 
-import com.vinurl.net.ClientEvent;
+import com.vinurl.net.Payloads;
+import com.vinurl.util.DiscData;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -16,7 +19,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.vinurl.VinURL.CUSTOM_RECORD;
-import static com.vinurl.util.Constants.*;
 
 @SuppressWarnings("unused")
 public class VinURLSound {
@@ -25,34 +27,38 @@ public class VinURLSound {
 
 	public static void playAt(ServerLevel level, ItemStack stack, BlockPos pos) {
 		send(stack, () -> playersInRange(level, pos, JUKEBOX_RANGE), (tag) ->
-			new ClientEvent.PlaySoundRecord(pos, -1, tag.get(URL_KEY))
+			new Payloads.PlaySound(pos, -1, DiscData.url(tag))
 		);
 	}
 
 	public static void playFor(ServerLevel level, ItemStack stack, int entityID) {
 		send(stack, () -> playersInRange(level, entityID, JUKEBOX_RANGE), (tag) ->
-			new ClientEvent.PlaySoundRecord(null, entityID, tag.get(URL_KEY))
+			new Payloads.PlaySound(null, entityID, DiscData.url(tag))
 		);
 	}
 
 	public static void stopAt(ServerLevel level, ItemStack stack, BlockPos pos, boolean cancelable) {
 		send(stack, () -> playersInRange(level, pos, INFINITE_RANGE), (tag) ->
-			new ClientEvent.StopSoundRecord(pos, -1, tag.get(URL_KEY), cancelable)
+			new Payloads.StopSound(pos, -1, DiscData.url(tag), cancelable)
 		);
 	}
 
 	public static void stopFor(ServerLevel level, ItemStack stack, int entityID, boolean cancelable) {
 		send(stack, () -> playersInRange(level, entityID, INFINITE_RANGE), (tag) ->
-			new ClientEvent.StopSoundRecord(null, entityID, tag.get(URL_KEY), cancelable)
+			new Payloads.StopSound(null, entityID, DiscData.url(tag), cancelable)
 		);
 	}
 
-	private static void send(ItemStack stack, Supplier<List<ServerPlayer>> players, Function<CompoundTag, Record> factory) {
+	private static void send(ItemStack stack, Supplier<List<ServerPlayer>> players, Function<CompoundTag, CustomPacketPayload> factory) {
 		if (!stack.is(CUSTOM_RECORD)) {return;}
 
 		CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+		CustomPacketPayload payload = factory.apply(tag);
 		for (ServerPlayer player : players.get()) {
-			NETWORK_CHANNEL.serverHandle(player).send(factory.apply(tag));
+			// Only send to players who have VinURL installed
+			if (ServerPlayNetworking.canSend(player, payload.type())) {
+				ServerPlayNetworking.send(player, payload);
+			}
 		}
 	}
 

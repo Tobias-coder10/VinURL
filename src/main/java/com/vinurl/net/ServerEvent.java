@@ -1,6 +1,8 @@
 package com.vinurl.net;
 
+import com.vinurl.util.DiscData;
 import com.vinurl.util.Url;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -14,7 +16,6 @@ import net.minecraft.world.item.component.CustomData;
 import java.util.stream.Stream;
 
 import static com.vinurl.VinURL.CUSTOM_RECORD;
-import static com.vinurl.util.Constants.*;
 
 
 public class ServerEvent {
@@ -23,13 +24,9 @@ public class ServerEvent {
 	public static final int MAX_DURATION = 3600;
 
 	public static void register() {
-		NETWORK_CHANNEL.registerClientboundDeferred(ClientEvent.GUIRecord.class);
-		NETWORK_CHANNEL.registerClientboundDeferred(ClientEvent.PlaySoundRecord.class);
-		NETWORK_CHANNEL.registerClientboundDeferred(ClientEvent.StopSoundRecord.class);
-
 		// Server event handler for setting the URL on the custom record
-		NETWORK_CHANNEL.registerServerbound(SetURLRecord.class, (message, access) -> {
-			Player player = access.player();
+		ServerPlayNetworking.registerGlobalReceiver(Payloads.SetUrl.TYPE, (message, context) -> {
+			Player player = context.player();
 			ItemStack stack = Stream.of(InteractionHand.values())
 				.map(player::getItemInHand)
 				.filter((stackInHand) -> stackInHand.is(CUSTOM_RECORD))
@@ -42,7 +39,7 @@ public class ServerEvent {
 			}
 
 			CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-			if (tag.get(LOCK_KEY)) {
+			if (DiscData.locked(tag)) {
 				player.sendOverlayMessage(Component.translatable("item.vinurl.custom_record.message.locked"));
 				return;
 			}
@@ -63,14 +60,10 @@ public class ServerEvent {
 				return;
 			}
 
-			tag.put(URL_KEY, url.toString());
-			tag.put(DURATION_KEY, message.duration());
-			tag.put(LOCK_KEY, message.lock());
+			DiscData.write(tag, url.toString(), message.duration(), message.lock());
 			stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
 			player.level().playSound(null, player, SoundEvents.VILLAGER_WORK_CARTOGRAPHER, SoundSource.MASTER, 1.0f, 1.0f);
 		});
 	}
-
-	public record SetURLRecord(String url, int duration, boolean lock) {}
 }
